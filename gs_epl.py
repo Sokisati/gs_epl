@@ -18,7 +18,6 @@ class GroundStationInterface:
         self.root.title("Ground Station Interface")
         self.root.geometry("1920x1080")
 
-        # Initialize variables
         self.stIp = '127.0.0.1'
         self.stPort = 12346
         self.iotData = 36
@@ -28,24 +27,24 @@ class GroundStationInterface:
         self.errorCodeList = [0, 0, 0, 0, 0]
         self.status = 0
 
-        self.buffer_size = 1024  # Buffer size for receiving data
+        self.buffer_size = 1024 
 
-        # Create a socket object for telemetry data
+  
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.stIp, self.stPort))
         self.server_socket.listen(5)
 
-        # Start a thread to listen for telemetry data
+        
         self.telemetry_thread = threading.Thread(target=self.listen_for_telemetry)
         self.telemetry_thread.daemon = True
         self.telemetry_thread.start()
 
-        # Start a thread to listen for camera footage
+    
         self.camera_thread = threading.Thread(target=self.listen_for_camera_footage)
         self.camera_thread.daemon = True
         self.camera_thread.start()
 
-        # Define frames for each section
+        
         self.camera_frame = tk.Frame(root, width=640, height=480, bg='white')
         self.map_frame = tk.Frame(root, width=640, height=480, bg='white')
         self.model_frame = tk.Frame(root, width=640, height=480, bg='white')
@@ -67,7 +66,7 @@ class GroundStationInterface:
 
         self.manual_detachment_frame = tk.Frame(root, width=320, height=40, bg='white')
 
-        # Place frames in grid
+       
         self.camera_frame.place(x=0, y=0)
         self.map_frame.place(x=0, y=480)
         self.model_frame.place(x=640, y=480)
@@ -81,27 +80,27 @@ class GroundStationInterface:
         self.pressure_frame.place(x=1280, y=320)
         self.temperature_frame.place(x=1280, y=640)
 
-        self.roll_pitch_yaw_frame.place(x=640, y=900)  # Adjusted position
-        self.filter_input_frame.place(x=0, y=900)  # Adjusted position
+        self.roll_pitch_yaw_frame.place(x=640, y=900) 
+        self.filter_input_frame.place(x=0, y=900)  
 
-        self.error_code_frame.place(x=840, y=900)  # Adjusted position
-        self.status_frame.place(x=1040, y=900)  # Adjusted position
+        self.error_code_frame.place(x=840, y=900)  
+        self.status_frame.place(x=1040, y=900)  
 
-        self.manual_detachment_frame.place(x=350, y=900)  # Adjusted position
+        self.manual_detachment_frame.place(x=350, y=900)  
 
-        # Add labels to frames for testing
+        
         tk.Label(self.camera_frame, text="").pack()
         tk.Label(self.map_frame, text="Map").pack()
         tk.Label(self.model_frame, text="3D Model").pack()
 
         tk.Label(self.iot_frame, text="IoT").pack()
-        tk.Label(self.battery_frame, text="Battery Voltage (V)").pack()  # Added unit
-        tk.Label(self.descent_frame, text="Descent Speed (m/s)").pack()  # Added unit
-        tk.Label(self.altitude_diff_frame, text="Altitude Difference (m)").pack()  # Added unit
+        tk.Label(self.battery_frame, text="Battery Voltage (V)").pack() 
+        tk.Label(self.descent_frame, text="Descent Speed (m/s)").pack()  
+        tk.Label(self.altitude_diff_frame, text="Altitude Difference (m)").pack()  
 
-        tk.Label(self.altitude_frame, text="Altitude (m)").pack()  # Added unit
-        tk.Label(self.pressure_frame, text="Pressure (hPa)").pack()  # Added unit
-        tk.Label(self.temperature_frame, text="Temperature (C)").pack()  # Added unit
+        tk.Label(self.altitude_frame, text="Altitude (m)").pack()  
+        tk.Label(self.pressure_frame, text="Pressure (hPa)").pack() 
+        tk.Label(self.temperature_frame, text="Temperature (C)").pack()  
 
         tk.Label(self.roll_pitch_yaw_frame, text="Roll, Pitch, Yaw").pack()
         tk.Label(self.filter_input_frame, text="Filter Input").pack()
@@ -111,20 +110,20 @@ class GroundStationInterface:
 
         tk.Label(self.manual_detachment_frame, text="Manual Detachment").pack()
 
-        # Add entry and button for filter command input
+      
         self.filter_command_entry = tk.Entry(self.filter_input_frame, width=30)
         self.filter_command_entry.pack(side=tk.LEFT, padx=5, pady=5)
         self.send_button = tk.Button(self.filter_input_frame, text="Send", command=self.update_filter_command)
         self.send_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
-        # Add button for manual detachment
+       
         self.manual_detachment_button = tk.Button(self.manual_detachment_frame, text="Manual Detachment", command=self.manual_detachment)
         self.manual_detachment_button.pack(padx=5, pady=5)
 
-        # Add matplotlib figures for graphs
+       
         self.create_graphs()
 
-        # Initialize OpenCV window for camera footage
+        
         self.camera_window = None
         
         self.error_code_boxes = []
@@ -133,7 +132,7 @@ class GroundStationInterface:
             box.pack(side=tk.LEFT, padx=2, pady=2)
             self.error_code_boxes.append(box)
 
-        # Initialize the status label
+       
         self.status_label = tk.Label(self.status_frame, text="Status: Waiting for data", bg='white')
         self.status_label.pack()
         
@@ -150,7 +149,7 @@ class GroundStationInterface:
     
     def save_frame(self, frame):
         if self.out is not None:
-            self.out.write(frame)  # Write the frame to the video file    
+            self.out.write(frame)  
             
     def listen_for_telemetry(self):
         print("Waiting for connection...")
@@ -171,9 +170,9 @@ class GroundStationInterface:
                     
     def on_closing(self):
         if self.out is not None:
-            self.out.release()  # Release the video writer
-        self.server_socket.close()  # Close the server socket
-        self.root.destroy()  # Destroy the Tkinter root window
+            self.out.release()  
+        self.server_socket.close()  
+        self.root.destroy()  
         
     def listen_for_camera_footage(self):
         udp_ip = "0.0.0.0" 
@@ -192,73 +191,57 @@ class GroundStationInterface:
                 self.save_frame(frame)  
 
     def display_camera_frame(self, frame):
-        # Convert the OpenCV frame to RGB format
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Convert the array to a PIL Image
         img = Image.fromarray(rgb_frame)
 
-        # Resize the image to fit the frame if needed, using LANCZOS for high-quality resizing
         img = img.resize((576, 432), Image.LANCZOS)
 
-        # Create a PhotoImage from the PIL Image
         photo = ImageTk.PhotoImage(image=img)
 
-        # Update the Tkinter Label with the new PhotoImage
         if not hasattr(self, 'camera_label'):
             self.camera_label = tk.Label(self.camera_frame, image=photo)
-            self.camera_label.image = photo  # Keep a reference to avoid garbage collection
+            self.camera_label.image = photo  
             self.camera_label.pack()
         else:
             self.camera_label.configure(image=photo)
             self.camera_label.image = photo  
 
     def update_telemetry_data(self, data):
-        # Update IoT data
         self.iot_data.append(data['iotData'])
         self.update_graph(self.iot_ax, self.iot_data, self.iot_canvas)
 
         self.status = data['stStatus']
 
-        # Update telemetry data from DataPack
         self.telemetry_data.append(data)
         if len(self.telemetry_data) > 10:
             self.telemetry_data.pop(0)
 
-        # Update Battery Voltage data
         self.battery_data.append(data['batteryVoltage'])
         self.update_graph(self.battery_ax, self.battery_data, self.battery_canvas)
 
-        # Update Descent Speed data
         self.descent_data.append(data['descentSpeed'])
         self.update_graph(self.descent_ax, self.descent_data, self.descent_canvas)
 
-        # Update Altitude Difference data
         self.altitude_diff_data.append(data['altitudeDifference'])
         self.update_graph(self.altitude_diff_ax, self.altitude_diff_data, self.altitude_diff_canvas)
 
-        # Update Altitude data
         self.satellite_altitude_data.append(data['satelliteAltitude'])
         self.shell_altitude_data.append(data['shellAltitude'])
         self.update_graph_dual(self.altitude_ax, self.satellite_altitude_data, self.shell_altitude_data, self.altitude_canvas)
 
-        # Update Pressure data
         self.satellite_pressure_data.append(data['satellitePressure'])
         self.shell_pressure_data.append(data['shellPressure'])
         self.update_graph_dual(self.pressure_ax, self.satellite_pressure_data, self.shell_pressure_data, self.pressure_canvas)
 
-        # Update Temperature data
         self.temperature_data.append(data['temperature'])
         self.update_graph(self.temperature_ax, self.temperature_data, self.temperature_canvas)
         
-        # Update error codes
         self.errorCodeList = data.get('errorCodeList', self.errorCodeList)
         self.update_error_code_boxes()
 
-        # Update status label
-        self.status_label.config(text=f"Status: {data.get('status', self.status)}")  # Update status based on incoming data
+        self.status_label.config(text=f"Status: {data.get('status', self.status)}") 
 
-        # Optionally, you can also process the GPS data if needed
         gps_latitude = data['gpsLat']
         gps_longitude = data['gpsLong']
         gps_altitude = data['gpsAlt']
@@ -271,45 +254,38 @@ class GroundStationInterface:
                 self.error_code_boxes[i].config(bg='red')
                 
     def create_graphs(self):
-        # IoT graph
         self.iot_fig, self.iot_ax = plt.subplots(figsize=(3, 2))
         self.iot_canvas = FigureCanvasTkAgg(self.iot_fig, master=self.iot_frame)
         self.iot_canvas.get_tk_widget().pack()
         self.iot_data = []
 
-        # Battery Voltage graph
         self.battery_fig, self.battery_ax = plt.subplots(figsize=(3, 2))
         self.battery_canvas = FigureCanvasTkAgg(self.battery_fig, master=self.battery_frame)
         self.battery_canvas.get_tk_widget().pack()
         self.battery_data = []
 
-        # Descent Speed graph
         self.descent_fig, self.descent_ax = plt.subplots(figsize=(3, 2))
         self.descent_canvas = FigureCanvasTkAgg(self.descent_fig, master=self.descent_frame)
         self.descent_canvas.get_tk_widget().pack()
         self.descent_data = []
 
-        # Altitude Difference graph
         self.altitude_diff_fig, self.altitude_diff_ax = plt.subplots(figsize=(3, 2))
         self.altitude_diff_canvas = FigureCanvasTkAgg(self.altitude_diff_fig, master=self.altitude_diff_frame)
         self.altitude_diff_canvas.get_tk_widget().pack()
         self.altitude_diff_data = []
 
-        # Altitude graph
         self.altitude_fig, self.altitude_ax = plt.subplots(figsize=(6, 3))
         self.altitude_canvas = FigureCanvasTkAgg(self.altitude_fig, master=self.altitude_frame)
         self.altitude_canvas.get_tk_widget().pack()
         self.satellite_altitude_data = []
         self.shell_altitude_data = []
 
-        # Pressure graph
         self.pressure_fig, self.pressure_ax = plt.subplots(figsize=(6, 3))
         self.pressure_canvas = FigureCanvasTkAgg(self.pressure_fig, master=self.pressure_frame)
         self.pressure_canvas.get_tk_widget().pack()
         self.satellite_pressure_data = []
         self.shell_pressure_data = []
 
-        # Temperature graph
         self.temperature_fig, self.temperature_ax = plt.subplots(figsize=(6, 3))
         self.temperature_canvas = FigureCanvasTkAgg(self.temperature_fig, master=self.temperature_frame)
         self.temperature_canvas.get_tk_widget().pack()
