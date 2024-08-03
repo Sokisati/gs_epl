@@ -4,7 +4,6 @@ import threading
 import json
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import random
 import time
 import socket
 
@@ -22,6 +21,7 @@ class GroundStationInterface:
         self.filterCommandList = '0'
         self.manuelDetachment = 0
         self.telemetry_data = []
+
         
         # Socket setup
         self.host = '127.0.0.1'  # IP address of the ground station
@@ -117,11 +117,6 @@ class GroundStationInterface:
         # Add matplotlib figures for graphs
         self.create_graphs()
 
-        # Start thread to generate mock telemetry data
-        self.mock_data_thread = threading.Thread(target=self.generate_mock_data)
-        self.mock_data_thread.daemon = True
-        self.mock_data_thread.start()
-
     def listen_for_telemetry(self):
         print("Waiting for connection...")
         client_socket, addr = self.server_socket.accept()
@@ -129,25 +124,25 @@ class GroundStationInterface:
 
         while True:
             data = client_socket.recv(self.buffer_size)
-            if not data:
-                break
-
-            try:
-                telemetry_data = json.loads(data.decode('utf-8'))
-                self.update_telemetry_data(telemetry_data)
-            except json.JSONDecodeError as e:
-                print(f"Error decoding telemetry data: {e}")
-
-        client_socket.close()
+            if data.decode('utf-8') == "SEND_DATA":
+                response = [62, self.filterCommandList, self.manuelDetachment]
+                client_socket.sendall(json.dumps(response).encode('utf-8'))
+            else:
+                try:
+                    telemetry_data = json.loads(data.decode('utf-8'))
+                    self.update_telemetry_data(telemetry_data)
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding telemetry data: {e}")
 
     def update_telemetry_data(self, data):
-        self.telemetry_data.append(data)
-        if len(self.telemetry_data) > 10:
-            self.telemetry_data.pop(0)
-
         # Update IoT data
         self.iot_data.append(data['iotData'])
         self.update_graph(self.iot_ax, self.iot_data, self.iot_canvas)
+
+        # Update telemetry data from DataPack
+        self.telemetry_data.append(data)
+        if len(self.telemetry_data) > 10:
+            self.telemetry_data.pop(0)
 
         # Update Battery Voltage data
         self.battery_data.append(data['batteryVoltage'])
@@ -174,6 +169,11 @@ class GroundStationInterface:
         # Update Temperature data
         self.temperature_data.append(data['temperature'])
         self.update_graph(self.temperature_ax, self.temperature_data, self.temperature_canvas)
+
+        # Optionally, you can also process the GPS data if needed
+        gps_latitude = data['gpsLat']
+        gps_longitude = data['gpsLong']
+        gps_altitude = data['gpsAlt']
 
 
     def create_graphs(self):
@@ -202,92 +202,29 @@ class GroundStationInterface:
         self.altitude_diff_data = []
 
         # Altitude graph
-        self.altitude_fig, self.altitude_ax = plt.subplots(figsize=(6, 2))
+        self.altitude_fig, self.altitude_ax = plt.subplots(figsize=(6, 3))
         self.altitude_canvas = FigureCanvasTkAgg(self.altitude_fig, master=self.altitude_frame)
         self.altitude_canvas.get_tk_widget().pack()
         self.satellite_altitude_data = []
         self.shell_altitude_data = []
 
         # Pressure graph
-        self.pressure_fig, self.pressure_ax = plt.subplots(figsize=(6, 2))
+        self.pressure_fig, self.pressure_ax = plt.subplots(figsize=(6, 3))
         self.pressure_canvas = FigureCanvasTkAgg(self.pressure_fig, master=self.pressure_frame)
         self.pressure_canvas.get_tk_widget().pack()
         self.satellite_pressure_data = []
         self.shell_pressure_data = []
 
         # Temperature graph
-        self.temperature_fig, self.temperature_ax = plt.subplots(figsize=(6, 2))
+        self.temperature_fig, self.temperature_ax = plt.subplots(figsize=(6, 3))
         self.temperature_canvas = FigureCanvasTkAgg(self.temperature_fig, master=self.temperature_frame)
         self.temperature_canvas.get_tk_widget().pack()
         self.temperature_data = []
-
-    def update_filter_command(self):
-        self.filterCommandList = self.filter_command_entry.get()
-
-    def manual_detachment(self):
-        self.manuelDetachment = 1
-
-    def generate_mock_data(self):
-        """
-        while True:
-            mock_data = {
-                'iotData': random.randint(20, 40),
-                'batteryVoltage': random.uniform(3.0, 4.2),
-                'descentSpeed': random.uniform(0, 10),
-                'altitudeDifference': random.uniform(0, 100),
-                'satelliteAltitude': random.uniform(0, 500),
-                'shellAltitude': random.uniform(0, 500),
-                'satellitePressure': random.uniform(900, 1100),
-                'shellPressure': random.uniform(900, 1100),
-                'temperature': random.uniform(-20, 40)
-            }
-            self.update_telemetry_data(mock_data)
-            time.sleep(1)
-            """
-        pass
-
-    def update_telemetry_data(self, data):
-        self.telemetry_data.append(data)
-        if len(self.telemetry_data) > 10:
-            self.telemetry_data.pop(0)
-
-        # Update IoT data
-        self.iot_data.append(data['iotData'])
-        self.update_graph(self.iot_ax, self.iot_data, self.iot_canvas)
-
-        # Update Battery Voltage data
-        self.battery_data.append(data['batteryVoltage'])
-        self.update_graph(self.battery_ax, self.battery_data, self.battery_canvas)
-
-        # Update Descent Speed data
-        self.descent_data.append(data['descentSpeed'])
-        self.update_graph(self.descent_ax, self.descent_data, self.descent_canvas)
-
-        # Update Altitude Difference data
-        self.altitude_diff_data.append(data['altitudeDifference'])
-        self.update_graph(self.altitude_diff_ax, self.altitude_diff_data, self.altitude_diff_canvas)
-
-        # Update Altitude data
-        self.satellite_altitude_data.append(data['satelliteAltitude'])
-        self.shell_altitude_data.append(data['shellAltitude'])
-        self.update_graph_dual(self.altitude_ax, self.satellite_altitude_data, self.shell_altitude_data, self.altitude_canvas)
-
-        # Update Pressure data
-        self.satellite_pressure_data.append(data['satellitePressure'])
-        self.shell_pressure_data.append(data['shellPressure'])
-        self.update_graph_dual(self.pressure_ax, self.satellite_pressure_data, self.shell_pressure_data, self.pressure_canvas)
-
-        # Update Temperature data
-        self.temperature_data.append(data['temperature'])
-        self.update_graph(self.temperature_ax, self.temperature_data, self.temperature_canvas)
 
     def update_graph(self, ax, data, canvas):
         ax.clear()
         ax.plot(data)
         canvas.draw()
-        print("manuel detachment state:"+str(self.manuelDetachment));
-        print("filter command list:"+str(self.filterCommandList) );
-              
 
     def update_graph_dual(self, ax, data1, data2, canvas):
         ax.clear()
@@ -296,7 +233,16 @@ class GroundStationInterface:
         ax.legend()
         canvas.draw()
 
-if __name__ == "__main__":
+    def update_filter_command(self):
+        self.filterCommandList = self.filter_command_entry.get()
+
+    def manual_detachment(self):
+        self.manuelDetachment = 1
+
+def main():
     root = tk.Tk()
     app = GroundStationInterface(root)
     root.mainloop()
+
+if __name__ == "__main__":
+    main()
