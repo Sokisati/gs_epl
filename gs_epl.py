@@ -156,7 +156,7 @@ class GroundStationInterface:
                     if not data:
                         print("Connection closed by the client.")
                         break
-                    if data.decode('utf-8') == "SEND_DATA":
+                    if data.decode('utf-8') == "SEND_DATA" or data.decode('utf-8') == "SEND_DATA\n":
                         response = [62, self.filterCommandList, self.manuelDetachment]
                         client_socket.sendall(json.dumps(response).encode('utf-8'))
                     else:
