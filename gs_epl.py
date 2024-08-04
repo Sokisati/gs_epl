@@ -266,7 +266,6 @@ class GroundStationInterface:
             print(f"Error updating telemetry data: {e}")
 
     def save_telemetry_data(self, data):
- 
         telemetry_row = {
             "Paket Numarasi": data['packetNumber'],
             "Uydu Statusu": data['stStatus'],
@@ -291,10 +290,11 @@ class GroundStationInterface:
             "Takim No": data['teamNumber'],
         }
 
+        # Save telemetry data to text file
         with open('telemetry_data.txt', 'a', encoding='utf-8') as txt_file:
             txt_file.write(json.dumps(telemetry_row, ensure_ascii=False) + '\n')
 
-
+        # Create or append to the Excel file
         if os.path.exists('telemetry_data.xlsx'):
             existing_df = pd.read_excel('telemetry_data.xlsx')
             df = pd.DataFrame([telemetry_row])
@@ -302,14 +302,14 @@ class GroundStationInterface:
         else:
             combined_df = pd.DataFrame([telemetry_row])
 
-
-        combined_df.to_excel('telemetry_data.xlsx', index=False)
-
-        with pd.ExcelWriter('telemetry_data.xlsx', mode='a', if_sheet_exists='overlay') as writer:
+        # Write to Excel with a new ExcelWriter context
+        with pd.ExcelWriter('telemetry_data.xlsx', mode='w', engine='xlsxwriter') as writer:
+            combined_df.to_excel(writer, index=False, sheet_name='Sheet1')
             worksheet = writer.sheets['Sheet1']
             for idx, col in enumerate(combined_df.columns):
                 max_len = max(combined_df[col].astype(str).map(len).max(), len(col)) + 2  
                 worksheet.set_column(idx, idx, max_len)
+
 
     def update_error_code_boxes(self):
         for i, code in enumerate(self.errorCodeList):
