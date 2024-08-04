@@ -166,7 +166,7 @@ class GroundStationInterface:
                         except json.JSONDecodeError as e:
                             print(f"Error decoding telemetry data: {e}")
             except socket.error as e:
-                if e.errno == 10054:  # Connection forcibly closed by the remote host
+                if e.errno == 10054: 
                     print("Error in telemetry listener: Connection was forcibly closed by the remote host.")
                 else:
                     print(f"Socket error in telemetry listener: {e}")
@@ -310,7 +310,6 @@ class GroundStationInterface:
                 max_len = max(combined_df[col].astype(str).map(len).max(), len(col)) + 2  
                 worksheet.set_column(idx, idx, max_len)
 
-
     def update_error_code_boxes(self):
         for i, code in enumerate(self.errorCodeList):
             if code == 0:
@@ -360,7 +359,40 @@ class GroundStationInterface:
             print(f"Error creating graphs: {e}")
 
     def update_filter_command(self):
-        self.filterCommandList = self.filter_command_entry.get()
+        input_command = self.filter_command_entry.get()
+    
+        if len(input_command) != 4:
+            print("Error: Input must be exactly 4 characters long.")
+            return
+    
+        try:
+            num0 = int(input_command[0])
+            color1 = input_command[1]
+            num2 = int(input_command[2])
+            color2 = input_command[3]
+        except ValueError:
+            print("Error: First and third characters must be numbers.")
+            return
+    
+        if not (0 <= num0 <= 10 and 0 <= num2 <= 10):
+            print("Error: Numbers must be between 0 and 10.")
+            return
+        if num0 + num2 != 10:
+            print("Error: The sum of the first and third characters must equal 10.")
+            return
+        if color1 not in ['R', 'G', 'B']:
+            print("Error: The second character must be 'R', 'G', or 'B'.")
+            return
+        if color2 not in ['R', 'G', 'B']:
+            print("Error: The fourth character must be 'R', 'G', or 'B'.")
+            return
+        if color1 == color2:
+            print("Error: The second and fourth characters must not be the same.")
+            return
+    
+        # Update filterCommandList if all checks pass
+        self.filterCommandList = input_command
+        print(f"Filter command updated to: {self.filterCommandList}")
 
     def update_graph(self, ax, data, canvas):
         try:
