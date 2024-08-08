@@ -20,6 +20,7 @@ from tkinter import Canvas
 import ctypes
 from PIL import Image
 
+
 class OpenGLThread(threading.Thread):
     def __init__(self, canvas, width, height):
         threading.Thread.__init__(self)
@@ -50,7 +51,7 @@ class OpenGLThread(threading.Thread):
             glPushMatrix()
             R = self.rotate_matrix(self.roll, self.pitch ,self.yaw)
             glMultMatrixf(R.T.flatten())  
-            self.draw_cylinder(0.5, 2, 36, 18)  
+            self.draw(0.5, 2, 36, 18)  
             glPopMatrix()
             pygame.display.flip()
             pygame.time.wait(50) 
@@ -65,6 +66,22 @@ class OpenGLThread(threading.Thread):
         self.pitch = pitch
         self.yaw = yaw
 
+    def should_render_top_first(self):
+        
+        bottom_cap_pos = np.array([0, 0, 0, 1])
+        top_cap_pos = np.array([0, 0, self.height, 1])
+    
+
+        R = self.rotate_matrix(self.roll, self.pitch, self.yaw)
+        bottom_cap_world = R @ bottom_cap_pos
+        top_cap_world = R @ top_cap_pos
+    
+       
+        if top_cap_world[2] < bottom_cap_world[2]:
+            return True  
+        else:
+            return False  
+
     def set_y_offset(self, offset):
         self.y_offset = offset
 
@@ -78,9 +95,8 @@ class OpenGLThread(threading.Thread):
         
         self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
         self.canvas.image = photo  
-
+        
     def draw_cylinder(self, radius, height, slices, stacks):
-       
         glBegin(GL_QUADS)
         for i in range(slices):
             theta1 = i * 2 * np.pi / slices
@@ -104,51 +120,65 @@ class OpenGLThread(threading.Thread):
                 glVertex3f(x2, y2, z2)
                 glVertex3f(x1, y1, z2)
         glEnd()
-        
-        if self.pitch>=0:
-            glBegin(GL_TRIANGLE_FAN)
-            glColor3f(0.0, 1.0, 0.0)  
-            glVertex3f(0, 0, 0)  
-            for i in range(slices + 1):
-                theta = i * 2 * np.pi / slices
-                x = radius * np.cos(theta)
-                y = radius * np.sin(theta)
-                glVertex3f(x, y, 0)
-            glEnd()
-        
-            glBegin(GL_TRIANGLE_FAN)
-            glColor3f(0.0, 0.0, 1.0)  
-            glVertex3f(0, 0, height)  
-            for i in range(slices + 1):
-                theta = i * 2 * np.pi / slices
-                x = radius * np.cos(theta)
-                y = radius * np.sin(theta)
-                glVertex3f(x, y, height)
-            glEnd()
-        else:
-        
-            glBegin(GL_TRIANGLE_FAN)
-            glColor3f(0.0, 0.0, 1.0)  
-            glVertex3f(0, 0, height)  
-            for i in range(slices + 1):
-                theta = i * 2 * np.pi / slices
-                x = radius * np.cos(theta)
-                y = radius * np.sin(theta)
-                glVertex3f(x, y, height)
-            glEnd()
+    
+    def draw_top_cap(self, radius, height, slices):
+        glBegin(GL_TRIANGLE_FAN)
+        glColor3f(0.0, 0.0, 1.0)  
+        glVertex3f(0, 0, height)  
+        for i in range(slices + 1):
+            theta = i * 2 * np.pi / slices
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
+            glVertex3f(x, y, height)
+        glEnd()
             
-            glBegin(GL_TRIANGLE_FAN)
-            glColor3f(0.0, 1.0, 0.0)  
-            glVertex3f(0, 0, 0)  
-            for i in range(slices + 1):
-                theta = i * 2 * np.pi / slices
-                x = radius * np.cos(theta)
-                y = radius * np.sin(theta)
-                glVertex3f(x, y, 0)
-            glEnd()
-        
-       
+    def draw_bottom_cap(self, radius, slices):
+        glBegin(GL_TRIANGLE_FAN)
+        glColor3f(0.0, 1.0, 0.0)  
+        glVertex3f(0, 0, 0)  
+        for i in range(slices + 1):
+            theta = i * 2 * np.pi / slices
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
+            glVertex3f(x, y, 0)
+        glEnd()        
 
+    def draw_axes(self, radius, height):
+        glLineWidth(2.0)
+        glEnable(GL_LINE_STIPPLE)  
+        glLineStipple(1, 0x00FF)  
+
+        glBegin(GL_LINES)
+        
+        
+        glColor3f(0.0, 0.0, 0.0)
+        glVertex3f(-radius * 2.5, 0, height / 2)
+        glVertex3f(radius * 2.5, 0, height / 2)
+        
+
+        glVertex3f(0, -radius * 2.5, height / 2)
+        glVertex3f(0, radius * 2.5, height / 2)
+        
+        z_extension = height * 0.4  
+        glVertex3f(0, 0, -z_extension)
+        glVertex3f(0, 0, height + z_extension)
+        
+        glEnd()
+        
+        glDisable(GL_LINE_STIPPLE)  
+
+    def draw(self, radius, height, slices, stacks):
+
+        self.draw_cylinder(radius, height, slices, stacks)
+        if self.should_render_top_first():
+            self.draw_top_cap(radius, height, slices)
+            self.draw_bottom_cap(radius, slices)
+        else:
+            self.draw_bottom_cap(radius, slices)
+            self.draw_top_cap(radius, height, slices)  
+            
+        self.draw_axes(radius,height);
+                    
     def rotate_matrix(self, roll, pitch, yaw):
         
         roll, pitch, yaw = np.radians(pitch), np.radians(roll), np.radians(yaw)
@@ -207,6 +237,8 @@ class GroundStationInterface:
         self.camera_thread.daemon = True
         self.camera_thread.start()
         
+        self.image_path = 'rpy.png'  
+        
         self.model_frame = tk.Frame(self.root, width=450, height=400, bg='white')
         self.model_frame.place(x=640, y=480)
 
@@ -239,6 +271,21 @@ class GroundStationInterface:
         self.roll_pitch_yaw_canvas = tk.Canvas(self.root, width=180, height=400, bg='white')
         self.roll_pitch_yaw_canvas.place(x=1080, y=480)  
         self.update_roll_pitch_yaw(0,0,0);
+    
+        self.load_image();
+
+    def load_image(self):
+        # Open the image file
+        self.image = Image.open(self.image_path)
+        # Resize the image to 640x480 using LANCZOS filter for high-quality downsampling
+        self.image = self.image.resize((110, 110), Image.LANCZOS)
+        # Convert the image to a Tkinter-compatible photo image
+        self.photo = ImageTk.PhotoImage(self.image)
+        # Create a label to display the image
+        self.image_label = tk.Label(self.root, image=self.photo)
+        self.image_label.place(x=640, y=480)
+
+
 
     def update_roll_pitch_yaw(self, roll, pitch, yaw):
         self.roll_pitch_yaw_canvas.delete("all")  
@@ -343,8 +390,7 @@ class GroundStationInterface:
             return False
 
         return True
-
-                    
+               
     def get_video_filename(self):
         currentDateTime = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_directory = "camera_footage"
