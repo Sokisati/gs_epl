@@ -11,13 +11,13 @@ from PIL import Image, ImageTk
 import os
 from datetime import datetime
 import pandas as pd
-
+import ctypes
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from tkinter import Canvas
-
+import ctypes
 from PIL import Image
 
 class OpenGLThread(threading.Thread):
@@ -34,10 +34,12 @@ class OpenGLThread(threading.Thread):
 
     def run(self):
         pygame.init()
-        pygame.display.set_mode((self.width, self.height), DOUBLEBUF | OPENGL)
+        display = pygame.display.set_mode((self.width, self.height), DOUBLEBUF | OPENGL | pygame.NOFRAME)
+        hwnd = pygame.display.get_wm_info()['window']  
+        ctypes.windll.user32.ShowWindow(hwnd, 0)  
+
         glViewport(0, 0, self.width, self.height)
         gluPerspective(45, (self.width / self.height), 0.1, 50.0)
-        
         
         glTranslatef(0, self.y_offset, -5)  
         glRotatef(-90, 1, 0, 0) 
@@ -51,7 +53,7 @@ class OpenGLThread(threading.Thread):
             self.draw_cylinder(0.5, 2, 36, 18)  
             glPopMatrix()
             pygame.display.flip()
-            pygame.time.wait(100) 
+            pygame.time.wait(50) 
             self.update_canvas()
 
     def stop(self):
@@ -103,27 +105,49 @@ class OpenGLThread(threading.Thread):
                 glVertex3f(x1, y1, z2)
         glEnd()
         
+        if self.pitch>=0:
+            glBegin(GL_TRIANGLE_FAN)
+            glColor3f(0.0, 1.0, 0.0)  
+            glVertex3f(0, 0, 0)  
+            for i in range(slices + 1):
+                theta = i * 2 * np.pi / slices
+                x = radius * np.cos(theta)
+                y = radius * np.sin(theta)
+                glVertex3f(x, y, 0)
+            glEnd()
         
-        glBegin(GL_TRIANGLE_FAN)
-        glColor3f(0.0, 1.0, 0.0)  
-        glVertex3f(0, 0, height)  
-        for i in range(slices + 1):
-            theta = i * 2 * np.pi / slices
-            x = radius * np.cos(theta)
-            y = radius * np.sin(theta)
-            glVertex3f(x, y, height)
-        glEnd()
+            glBegin(GL_TRIANGLE_FAN)
+            glColor3f(0.0, 0.0, 1.0)  
+            glVertex3f(0, 0, height)  
+            for i in range(slices + 1):
+                theta = i * 2 * np.pi / slices
+                x = radius * np.cos(theta)
+                y = radius * np.sin(theta)
+                glVertex3f(x, y, height)
+            glEnd()
+        else:
         
+            glBegin(GL_TRIANGLE_FAN)
+            glColor3f(0.0, 0.0, 1.0)  
+            glVertex3f(0, 0, height)  
+            for i in range(slices + 1):
+                theta = i * 2 * np.pi / slices
+                x = radius * np.cos(theta)
+                y = radius * np.sin(theta)
+                glVertex3f(x, y, height)
+            glEnd()
+            
+            glBegin(GL_TRIANGLE_FAN)
+            glColor3f(0.0, 1.0, 0.0)  
+            glVertex3f(0, 0, 0)  
+            for i in range(slices + 1):
+                theta = i * 2 * np.pi / slices
+                x = radius * np.cos(theta)
+                y = radius * np.sin(theta)
+                glVertex3f(x, y, 0)
+            glEnd()
         
-        glBegin(GL_TRIANGLE_FAN)
-        glColor3f(0.0, 0.0, 1.0)  
-        glVertex3f(0, 0, 0)  
-        for i in range(slices + 1):
-            theta = i * 2 * np.pi / slices
-            x = radius * np.cos(theta)
-            y = radius * np.sin(theta)
-            glVertex3f(x, y, 0)
-        glEnd()
+       
 
     def rotate_matrix(self, roll, pitch, yaw):
         
