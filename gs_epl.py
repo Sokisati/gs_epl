@@ -12,6 +12,148 @@ import os
 from datetime import datetime
 import pandas as pd
 
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from tkinter import Canvas
+
+from PIL import Image
+
+class OpenGLThread(threading.Thread):
+    def __init__(self, canvas, width, height):
+        threading.Thread.__init__(self)
+        self.canvas = canvas
+        self.width = width
+        self.height = height
+        self.roll = 0
+        self.pitch = 0
+        self.yaw = 0
+        self.y_offset = -1  
+        self.running = True
+
+    def run(self):
+        pygame.init()
+        pygame.display.set_mode((self.width, self.height), DOUBLEBUF | OPENGL)
+        glViewport(0, 0, self.width, self.height)
+        gluPerspective(45, (self.width / self.height), 0.1, 50.0)
+        
+        
+        glTranslatef(0, self.y_offset, -5)  
+        glRotatef(-90, 1, 0, 0) 
+        glClearColor(1.0, 1.0, 1.0, 0)
+        
+        while self.running:
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glPushMatrix()
+            R = self.rotate_matrix(self.roll, self.pitch ,self.yaw)
+            glMultMatrixf(R.T.flatten())  
+            self.draw_cylinder(0.5, 2, 36, 18)  
+            glPopMatrix()
+            pygame.display.flip()
+            pygame.time.wait(100) 
+            self.update_canvas()
+
+    def stop(self):
+        self.running = False
+        pygame.quit()
+
+    def update_orientation(self, roll, pitch, yaw):
+        self.roll = roll
+        self.pitch = pitch
+        self.yaw = yaw
+
+    def set_y_offset(self, offset):
+        self.y_offset = offset
+
+    def update_canvas(self):
+        buffer = glReadPixels(0, 0, self.width, self.height, GL_RGB, GL_UNSIGNED_BYTE)
+        image = np.frombuffer(buffer, dtype=np.uint8).reshape((self.height, self.width, 3))
+        image = np.flipud(image)  
+        image = Image.fromarray(image)
+        photo = ImageTk.PhotoImage(image=image)
+        
+        
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+        self.canvas.image = photo  
+
+    def draw_cylinder(self, radius, height, slices, stacks):
+       
+        glBegin(GL_QUADS)
+        for i in range(slices):
+            theta1 = i * 2 * np.pi / slices
+            theta2 = (i + 1) * 2 * np.pi / slices
+            x1 = radius * np.cos(theta1)
+            y1 = radius * np.sin(theta1)
+            x2 = radius * np.cos(theta2)
+            y2 = radius * np.sin(theta2)
+            
+            for j in range(stacks):
+                z1 = j * height / stacks
+                z2 = (j + 1) * height / stacks
+                
+                if (i + j) % 2 == 0:
+                    glColor3f(1.0, 0.0, 0.0)  
+                else:
+                    glColor3f(0.0, 0.0, 0.0)  
+                
+                glVertex3f(x1, y1, z1)
+                glVertex3f(x2, y2, z1)
+                glVertex3f(x2, y2, z2)
+                glVertex3f(x1, y1, z2)
+        glEnd()
+        
+        
+        glBegin(GL_TRIANGLE_FAN)
+        glColor3f(0.0, 1.0, 0.0)  
+        glVertex3f(0, 0, height)  
+        for i in range(slices + 1):
+            theta = i * 2 * np.pi / slices
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
+            glVertex3f(x, y, height)
+        glEnd()
+        
+        
+        glBegin(GL_TRIANGLE_FAN)
+        glColor3f(0.0, 0.0, 1.0)  
+        glVertex3f(0, 0, 0)  
+        for i in range(slices + 1):
+            theta = i * 2 * np.pi / slices
+            x = radius * np.cos(theta)
+            y = radius * np.sin(theta)
+            glVertex3f(x, y, 0)
+        glEnd()
+
+    def rotate_matrix(self, roll, pitch, yaw):
+        
+        roll, pitch, yaw = np.radians(pitch), np.radians(roll), np.radians(yaw)
+        
+        R_x = np.array([
+            [1, 0, 0, 0],
+            [0, np.cos(roll), -np.sin(roll), 0],
+            [0, np.sin(roll), np.cos(roll), 0],
+            [0, 0, 0, 1]
+        ])
+        
+        R_y = np.array([
+            [np.cos(pitch), 0, np.sin(pitch), 0],
+            [0, 1, 0, 0],
+            [-np.sin(pitch), 0, np.cos(pitch), 0],
+            [0, 0, 0, 1]
+        ])
+        
+        R_z = np.array([
+            [np.cos(yaw), -np.sin(yaw), 0, 0],
+            [np.sin(yaw), np.cos(yaw), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ])
+        
+        R = R_z @ R_y @ R_x
+        return R
+
+
 class GroundStationInterface:
     def __init__(self, root):
         self.root = root
@@ -40,6 +182,15 @@ class GroundStationInterface:
         self.camera_thread = threading.Thread(target=self.listen_for_camera_footage)
         self.camera_thread.daemon = True
         self.camera_thread.start()
+        
+        self.model_frame = tk.Frame(self.root, width=450, height=400, bg='white')
+        self.model_frame.place(x=640, y=480)
+
+        self.model_canvas = tk.Canvas(self.model_frame, width=450, height=400, bg='white')
+        self.model_canvas.pack(fill=tk.BOTH, expand=True)
+           
+        self.opengl_thread = OpenGLThread(self.model_canvas, 460, 400)
+        self.opengl_thread.start()
 
         self.setup_frames()
         self.setup_labels()
@@ -60,10 +211,24 @@ class GroundStationInterface:
         self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.out = cv2.VideoWriter(self.video_filename, self.fourcc, 20.0, (640, 480))
 
+
+        self.roll_pitch_yaw_canvas = tk.Canvas(self.root, width=180, height=400, bg='white')
+        self.roll_pitch_yaw_canvas.place(x=1080, y=480)  
+        self.update_roll_pitch_yaw(0,0,0);
+
+    def update_roll_pitch_yaw(self, roll, pitch, yaw):
+        self.roll_pitch_yaw_canvas.delete("all")  
+        
+        font = ('Helvetica', 18, 'bold')
+        
+        self.roll_pitch_yaw_canvas.create_text(92, 120, text=f"Roll = {roll:.2f}", font=font, fill='black')
+        self.roll_pitch_yaw_canvas.create_text(95, 190, text=f"Pitch = {pitch:.2f}", font=font, fill='black')
+        self.roll_pitch_yaw_canvas.create_text(92, 260, text=f"Yaw = {yaw:.2f}", font=font, fill='black')
+
     def setup_frames(self):
         self.camera_frame = tk.Frame(self.root, width=640, height=480, bg='white')
         self.map_frame = tk.Frame(self.root, width=640, height=480, bg='white')
-        self.model_frame = tk.Frame(self.root, width=640, height=480, bg='white')
+        #self.model_frame = tk.Frame(self.root, width=640, height=480, bg='white')
 
         self.iot_frame = tk.Frame(self.root, width=320, height=240, bg='white')
         self.battery_frame = tk.Frame(self.root, width=320, height=240, bg='white')
@@ -74,7 +239,6 @@ class GroundStationInterface:
         self.pressure_frame = tk.Frame(self.root, width=640, height=320, bg='white')
         self.temperature_frame = tk.Frame(self.root, width=640, height=320, bg='white')
 
-        self.roll_pitch_yaw_frame = tk.Frame(self.root, width=960, height=100, bg='white')
         self.filter_input_frame = tk.Frame(self.root, width=320, height=40, bg='white')
 
         self.error_code_frame = tk.Frame(self.root, width=500, height=40, bg='white')
@@ -95,7 +259,7 @@ class GroundStationInterface:
         self.pressure_frame.place(x=1280, y=320)
         self.temperature_frame.place(x=1280, y=640)
 
-        self.roll_pitch_yaw_frame.place(x=640, y=900)
+        
         self.filter_input_frame.place(x=0, y=900)
 
         self.error_code_frame.place(x=840, y=900)
@@ -106,7 +270,6 @@ class GroundStationInterface:
     def setup_labels(self):
         tk.Label(self.camera_frame, text="").pack()
         tk.Label(self.map_frame, text="Map").pack()
-        tk.Label(self.model_frame, text="3D Model").pack()
 
         tk.Label(self.iot_frame, text="IoT").pack()
         tk.Label(self.battery_frame, text="Battery Voltage (V)").pack()
@@ -117,7 +280,7 @@ class GroundStationInterface:
         tk.Label(self.pressure_frame, text="Pressure (hPa)").pack()
         tk.Label(self.temperature_frame, text="Temperature (C)").pack()
 
-        tk.Label(self.roll_pitch_yaw_frame, text="Roll, Pitch, Yaw").pack()
+        #tk.Label(self.roll_pitch_yaw_frame, text="Roll, Pitch, Yaw").pack()
         tk.Label(self.filter_input_frame, text="Filter Input").pack()
 
         tk.Label(self.error_code_frame, text="Error Codes").pack()
@@ -145,7 +308,7 @@ class GroundStationInterface:
             self.out.write(frame)
 
     def listen_for_telemetry(self):
-        while True:  # Keep listening for connections in a loop
+        while True:  
             try:
                 print("Waiting for connection...")
                 client_socket, addr = self.server_socket.accept()
@@ -177,6 +340,7 @@ class GroundStationInterface:
         try:
             if self.out is not None:
                 self.out.release()
+            self.opengl_thread.stop() 
             self.server_socket.close()
             self.root.destroy()
         except Exception as e:
@@ -220,7 +384,7 @@ class GroundStationInterface:
 
     def update_telemetry_data(self, data):
         try:
-            # Collect telemetry data
+            
             self.iot_data.append(data['iotData'])
             self.update_graph(self.iot_ax, self.iot_data, self.iot_canvas)
 
@@ -259,7 +423,14 @@ class GroundStationInterface:
             gps_longitude = data['gpsLong']
             gps_altitude = data['gpsAlt']
 
-            # Save telemetry data to files
+            if 'roll' in data and 'pitch' in data and 'yaw' in data:
+                self.opengl_thread.update_orientation(data['roll'], data['pitch'], data['yaw'])
+
+
+            if 'roll' in data and 'pitch' in data and 'yaw' in data:
+                self.update_roll_pitch_yaw(data['roll'], data['pitch'], data['yaw'])
+
+            
             self.save_telemetry_data(data)
 
         except Exception as e:
