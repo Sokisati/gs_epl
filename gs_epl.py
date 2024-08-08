@@ -288,14 +288,39 @@ class GroundStationInterface:
 
         tk.Label(self.manual_detachment_frame, text="Manual Detachment").pack()
 
-        self.filter_command_entry = tk.Entry(self.filter_input_frame, width=30)
-        self.filter_command_entry.pack(side=tk.LEFT, padx=5, pady=5)
+        # Add four character boxes
+        self.filter_command_entries = []
+        for _ in range(4):
+            entry = tk.Entry(self.filter_input_frame, width=2, font=('Helvetica', 18))
+            entry.pack(side=tk.LEFT, padx=5, pady=5)
+            self.filter_command_entries.append(entry)
+            
         self.send_button = tk.Button(self.filter_input_frame, text="Send", command=self.update_filter_command)
         self.send_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         self.manual_detachment_button = tk.Button(self.manual_detachment_frame, text="Manual Detachment", command=self.manual_detachment)
         self.manual_detachment_button.pack(padx=5, pady=5)
+        
+    def validate_filter_input(self):
+        valid_chars = {'R', 'G', 'B'}
+        entries = [entry.get() for entry in self.filter_command_entries]
 
+        if any(entry == '' for entry in entries):
+            return False
+
+        try:
+            num1, char2, num3, char4 = int(entries[0]), entries[1], int(entries[2]), entries[3]
+        except ValueError:
+            return False
+        if not (1 <= num1 <= 9) or not (1 <= num3 <= 9) or num1 + num3 != 10:
+            return False
+   
+        if char2 not in valid_chars or char4 not in valid_chars or char2 == char4:
+            return False
+
+        return True
+
+                    
     def get_video_filename(self):
         currentDateTime = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         save_directory = "camera_footage"
@@ -530,40 +555,12 @@ class GroundStationInterface:
             print(f"Error creating graphs: {e}")
 
     def update_filter_command(self):
-        input_command = self.filter_command_entry.get()
-    
-        if len(input_command) != 4:
-            print("Error: Input must be exactly 4 characters long.")
-            return
-    
-        try:
-            num0 = int(input_command[0])
-            color1 = input_command[1]
-            num2 = int(input_command[2])
-            color2 = input_command[3]
-        except ValueError:
-            print("Error: First and third characters must be numbers.")
-            return
-    
-        if not (0 <= num0 <= 10 and 0 <= num2 <= 10):
-            print("Error: Numbers must be between 0 and 10.")
-            return
-        if num0 + num2 != 10:
-            print("Error: The sum of the first and third characters must equal 10.")
-            return
-        if color1 not in ['R', 'G', 'B']:
-            print("Error: The second character must be 'R', 'G', or 'B'.")
-            return
-        if color2 not in ['R', 'G', 'B']:
-            print("Error: The fourth character must be 'R', 'G', or 'B'.")
-            return
-        if color1 == color2:
-            print("Error: The second and fourth characters must not be the same.")
-            return
-    
-        # Update filterCommandList if all checks pass
-        self.filterCommandList = input_command
-        print(f"Filter command updated to: {self.filterCommandList}")
+        if self.validate_filter_input():
+            self.filterCommandList = ''.join(entry.get() for entry in self.filter_command_entries)
+            print(f"Filter command updated: {self.filterCommandList}")
+        else:
+            print("Invalid input in filter command boxes.")
+
 
     def update_graph(self, ax, data, canvas):
         try:
