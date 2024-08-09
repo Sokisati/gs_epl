@@ -207,7 +207,6 @@ class OpenGLThread(threading.Thread):
         R = R_z @ R_y @ R_x
         return R
 
-
 class GroundStationInterface:
     def __init__(self, root):
         self.root = root
@@ -284,8 +283,6 @@ class GroundStationInterface:
         # Create a label to display the image
         self.image_label = tk.Label(self.root, image=self.photo)
         self.image_label.place(x=640, y=480)
-
-
 
     def update_roll_pitch_yaw(self, roll, pitch, yaw):
         self.roll_pitch_yaw_canvas.delete("all")  
@@ -405,6 +402,7 @@ class GroundStationInterface:
     def listen_for_telemetry(self):
         while True:  
             try:
+                
                 print("Waiting for connection...")
                 client_socket, addr = self.server_socket.accept()
                 print(f"Connection from {addr} has been established.")
@@ -415,7 +413,7 @@ class GroundStationInterface:
                         print("Connection closed by the client.")
                         break
                     if data.decode('utf-8') == "SEND_DATA" or data.decode('utf-8') == "SEND_DATA\n":
-                        response = [62, self.filterCommandList, self.manuelDetachment]
+                        response = [self.iotData, self.filterCommandList, self.manuelDetachment]
                         client_socket.sendall(json.dumps(response).encode('utf-8'))
                     else:
                         try:
@@ -477,56 +475,60 @@ class GroundStationInterface:
         except Exception as e:
             print(f"Error displaying camera frame: {e}")
 
+    def filterData(self,value,replacement):
+        return replacement if value == -666 else value
+
     def update_telemetry_data(self, data):
         try:
             
-            self.iot_data.append(data['iotData'])
+            processed_data = {key: self.filterData(value,0) for key, value in data.items()}
+            
+            self.iot_data.append(processed_data['iotData'])
             self.update_graph(self.iot_ax, self.iot_data, self.iot_canvas)
 
-            self.status = data['stStatus']
+            self.status = processed_data['stStatus']
 
-            self.telemetry_data.append(data)
+            self.telemetry_data.append(processed_data)
             if len(self.telemetry_data) > 10:
                 self.telemetry_data.pop(0)
 
-            self.battery_data.append(data['batteryVoltage'])
+            self.battery_data.append(processed_data['batteryVoltage'])
             self.update_graph(self.battery_ax, self.battery_data, self.battery_canvas)
 
-            self.descent_data.append(data['descentSpeed'])
+            self.descent_data.append(processed_data['descentSpeed'])
             self.update_graph(self.descent_ax, self.descent_data, self.descent_canvas)
 
-            self.altitude_diff_data.append(data['altitudeDifference'])
+            self.altitude_diff_data.append(processed_data['altitudeDifference'])
             self.update_graph(self.altitude_diff_ax, self.altitude_diff_data, self.altitude_diff_canvas)
 
-            self.satellite_altitude_data.append(data['satelliteAltitude'])
-            self.shell_altitude_data.append(data['shellAltitude'])
+            self.satellite_altitude_data.append(processed_data['satelliteAltitude'])
+            self.shell_altitude_data.append(processed_data['shellAltitude'])
             self.update_graph_dual(self.altitude_ax, self.satellite_altitude_data, self.shell_altitude_data, self.altitude_canvas)
 
-            self.satellite_pressure_data.append(data['satellitePressure'])
-            self.shell_pressure_data.append(data['shellPressure'])
+            self.satellite_pressure_data.append(processed_data['satellitePressure'])
+            self.shell_pressure_data.append(processed_data['shellPressure'])
             self.update_graph_dual(self.pressure_ax, self.satellite_pressure_data, self.shell_pressure_data, self.pressure_canvas)
 
-            self.temperature_data.append(data['temperature'])
+            self.temperature_data.append(processed_data['temperature'])
             self.update_graph(self.temperature_ax, self.temperature_data, self.temperature_canvas)
 
-            self.errorCodeList = data.get('errorCodeList', self.errorCodeList)
+            self.errorCodeList = processed_data.get('errorCodeList', self.errorCodeList)
             self.update_error_code_boxes()
 
-            self.status_label.config(text=f"Status: {data.get('status', self.status)}")
+            self.status_label.config(text=f"Status: {processed_data.get('status', self.status)}")
 
-            gps_latitude = data['gpsLat']
-            gps_longitude = data['gpsLong']
-            gps_altitude = data['gpsAlt']
+            gps_latitude = processed_data['gpsLat']
+            gps_longitude = processed_data['gpsLong']
+            gps_altitude = processed_data['gpsAlt']
 
-            if 'roll' in data and 'pitch' in data and 'yaw' in data:
-                self.opengl_thread.update_orientation(data['roll'], data['pitch'], data['yaw'])
-
-
-            if 'roll' in data and 'pitch' in data and 'yaw' in data:
-                self.update_roll_pitch_yaw(data['roll'], data['pitch'], data['yaw'])
-
+            if 'roll' in processed_data and 'pitch' in processed_data and 'yaw' in processed_data:
+                self.opengl_thread.update_orientation(processed_data['roll'], processed_data['pitch'], processed_data['yaw'])
+                self.update_roll_pitch_yaw(processed_data['roll'], processed_data['pitch'], processed_data['yaw'])
+        
             
-            self.save_telemetry_data(data)
+            log_data = {key: self.filterData(value,"n/a") for key, value in data.items()}
+
+            self.save_telemetry_data(log_data)
 
         except Exception as e:
             print(f"Error updating telemetry data: {e}")
@@ -564,6 +566,7 @@ class GroundStationInterface:
         if os.path.exists('telemetry_data.xlsx'):
             existing_df = pd.read_excel('telemetry_data.xlsx')
             df = pd.DataFrame([telemetry_row])
+            df.replace("", "n/a", inplace=True) 
             combined_df = pd.concat([existing_df, df], ignore_index=True)
         else:
             combined_df = pd.DataFrame([telemetry_row])
@@ -630,7 +633,6 @@ class GroundStationInterface:
             print(f"Filter command updated: {self.filterCommandList}")
         else:
             print("Invalid input in filter command boxes.")
-
 
     def update_graph(self, ax, data, canvas):
         try:
